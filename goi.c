@@ -7,6 +7,9 @@
 #include "util.h"
 #include "exporter.h"
 #include "settings.h"
+#include "semaphore.h"
+#include <fcntl.h>
+#include <sys/stat.h> 
 
 // including the "dead faction": 0
 #define MAX_FACTIONS 10
@@ -14,6 +17,7 @@
 // this macro is here to make the code slightly more readable, not because it can be safely changed to
 // any integer value; changing this to a non-zero value may break the code
 #define DEAD_FACTION 0
+#define MUTEX_VALUE 1
 
 /**
  * Specifies the number(s) of live neighbors of the same faction required for a dead cell to become alive.
@@ -37,6 +41,8 @@ bool isSurvivable(int n)
 bool willFight(int n) {
     return n > 0;
 }
+
+sem_t* mutex;
 
 /**
  * Computes and returns the next state of the cell specified by row and col based on currWorld and invaders. Sets *diedDueToFighting to
@@ -148,7 +154,7 @@ int goi(int nThreads, int nGenerations, const int *startWorld, int nRows, int nC
 
     // init the world!
     // we make a copy because we do not own startWorld (and will perform free() on world)
-    int *world = malloc(sizeof(int) * nRows * nCols);
+    int *world = malloc(sizeof(int) * nRows * nCols); // the 2d matrix is located in a contiguous memory space
     if (world == NULL)
     {
         return -1;
@@ -185,6 +191,7 @@ int goi(int nThreads, int nGenerations, const int *startWorld, int nRows, int nC
                 free(world);
                 return -1;
             }
+            // POTENTIAL to loop-level parallelise
             for (int row = 0; row < nRows; row++)
             {
                 for (int col = 0; col < nCols; col++)
@@ -208,16 +215,26 @@ int goi(int nThreads, int nGenerations, const int *startWorld, int nRows, int nC
         }
 
         // get new states for each cell
-        for (int row = 0; row < nRows; row++)
+        // attempt 1: parallelise this part
+        int row;
+        int col;
+        mutex = sem_open("mutex", O_CREAT | O_EXCL, 0644, MUTEX_VALUE);
+        #pragma omp parallel for shared(world, wholeNewWorld) private (row, col)
+        for (row = 0; row < nRows; row++)
         {
-            for (int col = 0; col < nCols; col++)
+            for (col = 0; col < nCols; col++)
             {
                 bool diedDueToFighting;
                 int nextState = getNextState(world, inv, nRows, nCols, row, col, &diedDueToFighting);
                 setValueAt(wholeNewWorld, nRows, nCols, row, col, nextState);
                 if (diedDueToFighting)
-                {
+                {   
+                    // approach 2: create the critical section here
+                    // sem_wait(mutex);
+                    #pragma omp critical
+                    //printf("death toll: %i\n", deathToll);
                     deathToll++;
+                    // sem_post(mutex);
                 }
             }
         }
