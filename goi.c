@@ -7,9 +7,7 @@
 #include "util.h"
 #include "exporter.h"
 #include "settings.h"
-#include "semaphore.h"
-#include <fcntl.h>
-#include <sys/stat.h> 
+#include <omp.h>
 
 // including the "dead faction": 0
 #define MAX_FACTIONS 10
@@ -42,8 +40,6 @@ bool willFight(int n) {
     return n > 0;
 }
 
-sem_t* mutex;
-
 /**
  * Computes and returns the next state of the cell specified by row and col based on currWorld and invaders. Sets *diedDueToFighting to
  * true if this cell should count towards the death toll due to fighting.
@@ -58,7 +54,7 @@ int getNextState(const int *currWorld, const int *invaders, int nRows, int nCols
     // faction of this cell
     int cellFaction = getValueAt(currWorld, nRows, nCols, row, col);
 
-    // did someone just get landed on?
+    // did someone just get landed on? the value is overriden by the invasion at this position
     if (invaders != NULL && getValueAt(invaders, nRows, nCols, row, col) != DEAD_FACTION)
     {
         *diedDueToFighting = cellFaction != DEAD_FACTION;
@@ -152,8 +148,15 @@ int goi(int nThreads, int nGenerations, const int *startWorld, int nRows, int nC
     // death toll due to fighting
     int deathToll = 0;
 
+    // set the number of threads
+    omp_set_num_threads(20);
+    #pragma omp parallel
+    {
+        nThreads = omp_get_num_threads();
+    }
     // init the world!
     // we make a copy because we do not own startWorld (and will perform free() on world)
+    // TODO: POTENTIAL to parallelise 
     int *world = malloc(sizeof(int) * nRows * nCols); // the 2d matrix is located in a contiguous memory space
     if (world == NULL)
     {
@@ -192,11 +195,14 @@ int goi(int nThreads, int nGenerations, const int *startWorld, int nRows, int nC
                 return -1;
             }
             // POTENTIAL to loop-level parallelise
-            for (int row = 0; row < nRows; row++)
+            int rowInv;
+            int colInv;
+            #pragma omp parallel for shared(inv, invasionPlans) private (rowInv, colInv)
+            for (rowInv = 0; rowInv < nRows; rowInv++)
             {
-                for (int col = 0; col < nCols; col++)
-                {
-                    setValueAt(inv, nRows, nCols, row, col, getValueAt(invasionPlans[invasionIndex], nRows, nCols, row, col));
+                for (colInv = 0; colInv < nCols; colInv++)
+                {   
+                    setValueAt(inv, nRows, nCols, rowInv, colInv, getValueAt(invasionPlans[invasionIndex], nRows, nCols, rowInv, colInv));
                 }
             }
             invasionIndex++;
@@ -218,7 +224,6 @@ int goi(int nThreads, int nGenerations, const int *startWorld, int nRows, int nC
         // attempt 1: parallelise this part
         int row;
         int col;
-        mutex = sem_open("mutex", O_CREAT | O_EXCL, 0644, MUTEX_VALUE);
         #pragma omp parallel for shared(world, wholeNewWorld) private (row, col)
         for (row = 0; row < nRows; row++)
         {
