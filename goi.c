@@ -147,13 +147,16 @@ int goi(int nThreads, int nGenerations, const int *startWorld, int nRows, int nC
 {
     // death toll due to fighting
     int deathToll = 0;
+    int threads;
+    // set the number of threads for OpenMP here
+    omp_set_num_threads(nThreads);
 
-    // set the number of threads
-    omp_set_num_threads(20);
     #pragma omp parallel
     {
-        nThreads = omp_get_num_threads();
+        threads = omp_get_num_threads();
     }
+    printf("Number of threads used for parallel: %i\n", threads);
+
     // init the world!
     // we make a copy because we do not own startWorld (and will perform free() on world)
     // TODO: POTENTIAL to parallelise 
@@ -237,7 +240,7 @@ int goi(int nThreads, int nGenerations, const int *startWorld, int nRows, int nC
                     // approach 2: create the critical section here
                     // sem_wait(mutex);
                     #pragma omp critical
-                    //printf("death toll: %i\n", deathToll);
+                    // printf("increase deathToll at iteration %i at row: %i and col: %i\n", i, row, col);
                     deathToll++;
                     // sem_post(mutex);
                 }
@@ -256,6 +259,7 @@ int goi(int nThreads, int nGenerations, const int *startWorld, int nRows, int nC
 #if PRINT_GENERATIONS
         printf("\n=== WORLD %d ===\n", i);
         printWorld(world, nRows, nCols);
+        printf("end of iteration %i\n", i);
 #endif
 
 #if EXPORT_GENERATIONS

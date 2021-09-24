@@ -12,6 +12,8 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <errno.h>
+#include <time.h>
+#include <omp.h>
 #include "util.h"
 #include "exporter.h"
 #include "settings.h"
@@ -34,6 +36,7 @@ int main(int argc, char *argv[])
     int **invasionPlans;
     int nThreads;
 
+    // FILE *analysisFile;
     FILE *outputFile;
     FILE *inputFile;
     char *line = NULL;
@@ -52,7 +55,7 @@ int main(int argc, char *argv[])
     printf("<INPUT_PATH>: %s\n", argv[1]);
     printf("<OUTPUT_PATH>: %s\n", argv[2]);
     printf("<NUM_THREADS>: %s\n", argv[3]);
-
+    // analysisFile = fopen("analysisFile.out", "a");
 #if EXPORT_GENERATIONS
     FILE *exportFile = NULL;
     if (argc >= 5)
@@ -62,7 +65,7 @@ int main(int argc, char *argv[])
         initWorldExporter(exportFile);
     }
 #endif
-
+    clock_t start = clock();
     inputFile = fopen(argv[1], "r");
     if (inputFile == NULL)
     {
@@ -176,9 +179,16 @@ int main(int argc, char *argv[])
     // run the simulation
     int warDeathToll = goi(nThreads, nGenerations, startWorld, nRows, nCols, nInvasions, invasionTimes, invasionPlans);
 
+    clock_t end = clock();
+    double time_spent = (double) (end - start) / CLOCKS_PER_SEC;
+    double time_spent_total = time_spent / nThreads;
+    
     // output the result
     fprintf(outputFile, "%d", warDeathToll);
     fclose(outputFile);
+
+    // fprintf(analysisFile, "%s with %s threads took %f\n", argv[1], argv[3], time_spent_total);
+    // fclose(analysisFile);
 
 #if EXPORT_GENERATIONS
     if (exportFile != NULL)

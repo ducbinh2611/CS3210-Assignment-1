@@ -1,0 +1,9 @@
+./sample_inputs_varies_gen/700000.in with 1 threads took 269.821699
+./sample_inputs_varies_gen/700000.in with 2 threads took 136.430917
+./sample_inputs_varies_gen/700000.in with 4 threads took 73.545497
+./sample_inputs_varies_gen/700000.in with 8 threads took 49.897608
+./sample_inputs_varies_gen/700000.in with 16 threads took 41.100598
+./sample_inputs_varies_gen/700000.in with 17 threads took 34.856685
+./sample_inputs_varies_gen/700000.in with 18 threads took 35.649688
+./sample_inputs_varies_gen/700000.in with 19 threads took 35.402335
+./sample_inputs_varies_gen/700000.in with 20 threads took 38.195297
